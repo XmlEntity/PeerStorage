@@ -24,8 +24,16 @@ def create_id():
     return user_hash
 
 
-def update_db():
-    pass
+def update_db(nodes):
+    for i in range(len(nodes)):
+        if '\n' not in nodes[i]:
+            nodes[i] += '\n'
+
+    tools.dht.extend(nodes)
+    tools.dht = list(set(tools.dht))
+
+    with open(tools.dht_path, 'w') as f:
+        f.writelines(tools.dht)
 
 
 def get():
@@ -66,10 +74,15 @@ def get():
 def put(similarities, command):
     print("Sort_similarities: " + str(similarities))
 
+    received_nodes = []
     for sim in similarities:
         print(str(sim))
+        if '-' in sim:  # If this is a node that we received from other node (other nodes sends us ip with hash)
+            sim = sim.split('-')[1]
+
         node_ip = sim.split(':')[0]
         node_port = sim.split(':')[1]
+
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((node_ip, int(node_port)))
@@ -92,15 +105,19 @@ def put(similarities, command):
                         nodes.clear()
                     elif len(nodes) != 0:  # If received list contains at least one element
                         similarities.extend(nodes)
+                        received_nodes.extend(nodes)
 
                 else:  # elif '[OK]' not in str(nodes) - draft
                     print("File found! " + filename + " is:\n" + str(pickle.loads(recvdata)))
-                    return  # Exit from the function if we found the file
+                    break  # Break loop if we found the file
         except Exception as ex:
             print('Exception: ' + str(ex))
             pass
 
     print("Now similarities is: " + str(similarities))  # After that we should update the dht database with theese nodes
+    update_db(received_nodes)
+    if '<<search>>' not in command:
+        pass
 
 
 if len(sys.argv) == 3 and not os.path.isfile(sys.argv[2]):

@@ -85,7 +85,7 @@ def put_handler(file_hash, sender_hash, file_content, file_hash_path):
         #         f.write(file_content)
         #     print("File saved!")
 
-        nodes_to_send.append(node)
+        nodes_to_send.append(node_hash + '-' + node)
         i += 1
 
     if len(nodes_to_send) != 0:
