@@ -24,6 +24,10 @@ def create_id():
     return user_hash
 
 
+def update_db():
+    pass
+
+
 def get():
     shuffled_dht = list(tools.dht)
     shuffled_dht.pop(0)
@@ -91,9 +95,12 @@ def put(similarities, command):
 
                 else:  # elif '[OK]' not in str(nodes) - draft
                     print("File found! " + filename + " is:\n" + str(pickle.loads(recvdata)))
+                    return  # Exit from the function if we found the file
         except Exception as ex:
             print('Exception: ' + str(ex))
             pass
+
+    print("Now similarities is: " + str(similarities))  # After that we should update the dht database with theese nodes
 
 
 if len(sys.argv) == 3 and not os.path.isfile(sys.argv[2]):
