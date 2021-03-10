@@ -30,7 +30,9 @@ def update_db(nodes):
             nodes[i] += '\n'
 
     tools.dht.extend(nodes)
+    tools.dht.pop(0)
     tools.dht = list(set(tools.dht))
+    tools.dht.insert(0, user_data)
 
     with open(tools.dht_path, 'w') as f:
         f.writelines(tools.dht)
