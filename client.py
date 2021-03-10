@@ -24,6 +24,14 @@ def create_id():
     return user_hash
 
 
+def upload_file(file, content):
+    pass
+
+
+def sort_db():
+    pass
+
+
 def update_db(nodes):
     for i in range(len(nodes)):
         if '\n' not in nodes[i]:
@@ -36,6 +44,8 @@ def update_db(nodes):
 
     with open(tools.dht_path, 'w') as f:
         f.writelines(tools.dht)
+
+    sort_db()  # Sort the DHT by our hash for each update
 
 
 def get():
@@ -116,10 +126,11 @@ def put(similarities, command):
             print('Exception: ' + str(ex))
             pass
 
-    print("Now similarities is: " + str(similarities))  # After that we should update the dht database with theese nodes
-    update_db(received_nodes)
+    print("Now similarities is: " + str(similarities))
+    update_db(received_nodes)  # After that we should update the dht database with theese nodes
     if '<<search>>' not in command:
-        pass
+        # When we updated the DHT and sorted it, we should call the upload_file function
+        upload_file(filename, data)
 
 
 if len(sys.argv) == 3 and not os.path.isfile(sys.argv[2]):
