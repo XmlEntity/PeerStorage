@@ -17,13 +17,13 @@ def connection(conn, addr):
         data = data.decode(encoding='utf-8')
         data = data.split(':')  # Example of the request part: put:<random_hash>-127.0.0.1:4444
         cmd = data[0]  # Get requested command ('put' or 'get')
-        address = data[1]  # Get sender's "hash-127.0.0.1" from received data
-        address_splitted = address.split('-')  # Split address to get an ip
-        ip = address_splitted[1]  # We removed "hash-" from the address to get sender's ip
+        sender_address = data[1]  # Get sender's "hash-127.0.0.1" from received data
+        address_splitted = sender_address.split('-')  # Split address to get an ip
+        sender_hash = address_splitted[0]  # We removed "-127.0.0.1" from the address to get sender's hash
         port = data[2]
-        dht_append(address + ':' + port)
-        print("Appended: " + address + ':' + port)
-        address = ip + ':' + port  # Now address is ip:port instead of hash-ip:port
+        dht_append(sender_address + ':' + port)
+        print("Appended: " + sender_address + ':' + port)
+        # address = ip + ':' + port  # Now address is ip:port instead of hash-ip:port
         if cmd == 'get':
             print("GET request!")
             conn.sendall(pickle.dumps(tools.dht))
@@ -44,7 +44,7 @@ def connection(conn, addr):
                 # use "put_handler" function to find out which nodes can have it.
                 # This function is also used to save files from 'put' request and
                 # send nodes that are "closer" to the file hash.
-                result = put_handler(file_hash, address.replace('\n', ''), file_content, file_hash_path)
+                result = put_handler(file_hash, sender_hash.replace('\n', ''), file_content, file_hash_path)
             conn.sendall(pickle.dumps(result))
         else:
             conn.sendall(pickle.dumps("[wrong_command]"))
@@ -53,9 +53,9 @@ def connection(conn, addr):
         break
 
 
-def put_handler(file_hash, sender_ip, file_content, file_hash_path):
+def put_handler(file_hash, sender_hash, file_content, file_hash_path):
     result = '[OK]'
-    hash_id = tools.dht[0].split('-')[0]
+    # hash_id = tools.dht[0].split('-')[0]
 
     sorted_similarities = tools.get_similarity(file_hash)
     sorted_similarities = dict(sorted_similarities)
@@ -63,27 +63,27 @@ def put_handler(file_hash, sender_ip, file_content, file_hash_path):
     i = 0
     nodes_to_send = []
     for node in sorted_similarities.keys():
-        if i > 1:  # i - number of nodes we want to include in the best similarity list
-            break
-        elif sender_ip in node:
-            # If the node in current iteration is equal to
-            # sender's ip, which is being processed by 'connection' function,
-            # then we need to skip the iteration.
-            continue
-
         node_metadata = sorted_similarities[node]  # Get node's hash similarity with the file_hash
         node_hash = node_metadata[1]  # Get node's hash from the node_metadata
         # node_metadata is a list that contains [similarity, node_hash],
         # so we need to get the second element (node_hash) from it.
 
-        if node_hash == hash_id and file_content != "<<search>>":
-            # If our node is in the first N nodes in sorted_similarities, we
-            # should to save it. The file name is equal to its hash name,
-            # because if current request would be 'search', then we would have to find
-            # the contents of the file by its hash.
-            with open(file_hash_path, 'w') as f:
-                f.write(file_content)
-            print("File saved!")
+        if i > 1:  # i - number of nodes we want to include in the best similarity list
+            break
+        elif node_hash == sender_hash:
+            # If the node in current iteration is equal to
+            # sender's hash, which is being processed by 'connection' function,
+            # then we need to skip the iteration.
+            continue
+
+        # if node_hash == hash_id and file_content != "<<search>>":
+        #     # If our node is in the first N nodes in sorted_similarities, we
+        #     # should to save it. The file name is equal to its hash name,
+        #     # because if current request would be 'search', then we would have to find
+        #     # the contents of the file by its hash.
+        #     with open(file_hash_path, 'w') as f:
+        #         f.write(file_content)
+        #     print("File saved!")
 
         nodes_to_send.append(node)
         i += 1
