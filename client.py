@@ -131,7 +131,7 @@ else:
 server.start(HOST, PORT)
 
 
-commands = ['help - show this message', 'get - update DHT', 'put - send file to DHT', 'search - search for a file']
+commands = ['help - show this message', 'id - print your user_hash', 'get - update DHT', 'put - send file to DHT', 'search - search for a file']
 while True:
     cmd = input("Your command: ")
     if cmd == 'help':
@@ -140,6 +140,8 @@ while True:
         print(str(tools.dht))
     elif cmd == 'get':
         get()
+    elif cmd == 'id':
+        print("Your id: " + user_hash)
     elif cmd == 'put' or cmd == 'search':
         filename = str(input("File name: "))
         if cmd == 'search':
