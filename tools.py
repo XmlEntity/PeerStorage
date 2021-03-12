@@ -1,7 +1,7 @@
 import Levenshtein
 from hashlib import sha1
 
-dht = []  # List with hash table from dht_path
+dht = ()  # List with hash table from dht_path
 dht_path = ""  # Path to the contents of the hash table
 dht_storage = ""  # Directory with files from other nodes
 
@@ -25,7 +25,8 @@ def get_similarity(data_hash):
         node_address = node[1]
         similarity = Levenshtein.ratio(str(data_hash), node_hash)
         print("Similarity " + str(data_hash) + " and " + node_hash + '-' + node_address + " is " + str(similarity))
-        similarities[node_address] = [similarity, node_hash]
+        similarities[node_hash + '-' + node_address + '\n'] = similarity
 
     sorted_similarities = sorted(similarities.items(), key=lambda x: x[1], reverse=True)  # Sort in descending order
+    sorted_similarities = tuple(dict(sorted_similarities).keys())
     return sorted_similarities
