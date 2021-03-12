@@ -28,24 +28,21 @@ def upload_file(file, content):
     pass
 
 
-def sort_db():
-    pass
-
-
 def update_db(nodes):
     for i in range(len(nodes)):
         if '\n' not in nodes[i]:
             nodes[i] += '\n'
-
-    tools.dht.extend(nodes)
-    tools.dht.pop(0)
-    tools.dht = list(set(tools.dht))
-    tools.dht.insert(0, user_data)
+    temporary_dht = list(tools.dht)  # Create a temporary variable to add data to DHT (variable type is tuple)
+    temporary_dht.pop(0)
+    temporary_dht.extend(nodes)
+    temporary_dht = list(set(temporary_dht))  # temporary_dht contains only unique data
+    temporary_dht.insert(0, user_data)
+    tools.dht = tuple(temporary_dht)
+    similarities = tools.get_similarity(user_hash)  # Sort the DHT by our hash
 
     with open(tools.dht_path, 'w') as f:
-        f.writelines(tools.dht)
-
-    sort_db()  # Sort the DHT by our hash for each update
+        f.writelines(similarities)
+    tools.dht = tuple(similarities)
 
 
 def get():
@@ -76,7 +73,7 @@ def get():
                     f.writelines(append_list)
                 with open(tools.dht_path, 'r') as f:
                     new_dht = f.readlines()
-                tools.dht = new_dht
+                tools.dht = tuple(new_dht)
             break
         except Exception as ex:
             print(str(ex))
@@ -93,7 +90,7 @@ def put(similarities, command):
             sim = sim.split('-')[1]
 
         node_ip = sim.split(':')[0]
-        node_port = sim.split(':')[1]
+        node_port = sim.split(':')[1].replace('\n', '')
 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -103,14 +100,14 @@ def put(similarities, command):
                 nodes = list(pickle.loads(recvdata))
 
                 if ':' in str(nodes):  # If we received '127.0.0.1:4444' for example
-                    for node in nodes:
+                    for i in range(len(nodes)):
                         # Here we're removing our ip from list and if we have
                         # the same node in the sorted similarities list, we need
                         # to remove it from the received list too.
-                        if user_ip in str(node):
-                            nodes.remove(node)
-                        elif str(node) in str(similarities):
-                            nodes.remove(node)
+                        if user_ip in str(nodes[i]):
+                            nodes.remove(nodes[i])
+                        elif str(nodes[i]).replace('\n', '') in str(similarities):
+                            nodes.remove(nodes[i])
 
                     if len(nodes) == 1 and nodes[0] in str(similarities):
                         # This fixes a bug when 'for' loop in the lines above can't remove the last element
@@ -118,6 +115,7 @@ def put(similarities, command):
                     elif len(nodes) != 0:  # If received list contains at least one element
                         similarities.extend(nodes)
                         received_nodes.extend(nodes)
+                    received_nodes = list(set(received_nodes))
 
                 else:  # elif '[OK]' not in str(nodes) - draft
                     print("File found! " + filename + " is:\n" + str(pickle.loads(recvdata)))
@@ -125,7 +123,7 @@ def put(similarities, command):
         except Exception as ex:
             print('Exception: ' + str(ex))
             pass
-
+    print("Received nodes is: " + str(received_nodes))
     print("Now similarities is: " + str(similarities))
     update_db(received_nodes)  # After that we should update the dht database with theese nodes
     if '<<search>>' not in command:
@@ -140,7 +138,7 @@ if len(sys.argv) == 3 and not os.path.isfile(sys.argv[2]):
     user_data = user_hash + '-' + HOST + ':' + str(PORT) + '\n'
     with open(tools.dht_path, 'w') as f:
         f.write(user_data)
-    tools.dht = user_data
+    tools.dht = tuple(user_data)
     tools.dht_storage = tools.dht_path.split('.')[0]
     os.mkdir(tools.dht_storage)
 elif len(sys.argv) == 2:
@@ -150,7 +148,7 @@ elif len(sys.argv) == 2:
     print("dht_storage is: " + tools.dht_storage)
     if os.path.isfile(tools.dht_path):
         with open(tools.dht_path, 'r') as f:
-            tools.dht = f.readlines()
+            tools.dht = tuple(f.readlines())
             user_data = tools.dht[0]  # The first element in dht is our node
             address = user_data.split('-')[1]
             HOST = address.split(':')[0]
@@ -164,7 +162,6 @@ else:
     print('Wrong arguments')
     sys.exit()
 
-# server.dht_path = dht_path
 server.start(HOST, PORT)
 
 
@@ -188,16 +185,17 @@ while True:
                 data = f.read()
         command = 'put:' + user_data + ':' + filename + '=' + data  # put:hash-127.0.0.1:33:file.txt=some_text
         print(filename)
-        filename_hash = tools.create_hash(filename).replace("'", "")
+        filename_hash = tools.create_hash(filename)
+        similarities = list(tools.get_similarity(filename_hash))
 
-        similarities = dict(tools.get_similarity(filename_hash))
-        for sim in similarities.keys():
-            value = similarities[sim]  # Get [similarity, node_hash] of the current node in 'similarities' dictionary
-            if value[1] == user_hash:  # If this is our hash, we remove it from the dictionary
-                similarities.pop(sim)
+        for i in range(len(similarities)):
+            node_metadata = similarities[i].split('-')
+            node_hash = node_metadata[0]
+
+            if node_hash == user_hash:  # If this is our hash, we remove it from the dictionary
+                similarities.pop(i)
                 break
 
-        similarities = list(similarities.keys())
         similarities = similarities[:5]  # Get first five nodes that have the best similarity with data_hash
         put(similarities, command)
     else:

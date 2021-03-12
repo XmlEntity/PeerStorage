@@ -23,7 +23,7 @@ def connection(conn, addr):
         port = data[2]
         dht_append(sender_address + ':' + port)
         print("Appended: " + sender_address + ':' + port)
-        # address = ip + ':' + port  # Now address is ip:port instead of hash-ip:port
+
         if cmd == 'get':
             print("GET request!")
             conn.sendall(pickle.dumps(tools.dht))
@@ -44,7 +44,7 @@ def connection(conn, addr):
                 # use "put_handler" function to find out which nodes can have it.
                 # This function is also used to save files from 'put' request and
                 # send nodes that are "closer" to the file hash.
-                result = put_handler(file_hash, sender_hash.replace('\n', ''), file_content, file_hash_path)
+                result = put_handler(file_hash, sender_hash.replace('\n', ''))
             conn.sendall(pickle.dumps(result))
         else:
             conn.sendall(pickle.dumps("[wrong_command]"))
@@ -53,22 +53,18 @@ def connection(conn, addr):
         break
 
 
-def put_handler(file_hash, sender_hash, file_content, file_hash_path):
+def put_handler(file_hash, sender_hash):
     result = '[OK]'
-    # hash_id = tools.dht[0].split('-')[0]
 
     sorted_similarities = tools.get_similarity(file_hash)
-    sorted_similarities = dict(sorted_similarities)
 
-    i = 0
     nodes_to_send = []
-    for node in sorted_similarities.keys():
-        node_metadata = sorted_similarities[node]  # Get node's hash similarity with the file_hash
-        node_hash = node_metadata[1]  # Get node's hash from the node_metadata
-        # node_metadata is a list that contains [similarity, node_hash],
-        # so we need to get the second element (node_hash) from it.
 
-        if i > 1:  # i - number of nodes we want to include in the best similarity list
+    for i in range(len(sorted_similarities)):
+        node_metadata = sorted_similarities[i].split('-')
+        node_hash = node_metadata[0]
+
+        if i > 2:  # i - number of nodes we want to include in the best similarity list
             break
         elif node_hash == sender_hash:
             # If the node in current iteration is equal to
@@ -76,20 +72,11 @@ def put_handler(file_hash, sender_hash, file_content, file_hash_path):
             # then we need to skip the iteration.
             continue
 
-        # if node_hash == hash_id and file_content != "<<search>>":
-        #     # If our node is in the first N nodes in sorted_similarities, we
-        #     # should to save it. The file name is equal to its hash name,
-        #     # because if current request would be 'search', then we would have to find
-        #     # the contents of the file by its hash.
-        #     with open(file_hash_path, 'w') as f:
-        #         f.write(file_content)
-        #     print("File saved!")
-
-        nodes_to_send.append(node_hash + '-' + node)
-        i += 1
+        nodes_to_send.append(sorted_similarities[i])
 
     if len(nodes_to_send) != 0:
         result = nodes_to_send
+    print("Nodes to send: " + str(nodes_to_send))
     return result
 
 
@@ -111,8 +98,6 @@ def listening(host, port):
 def dht_append(node):
     # This function checks if a node exists in our hash table,
     # and if not, we add a new node to the hash table.
-    print("Node to append is " + node)
-    print(tools.dht)
     if node.replace('\n', '') not in str(tools.dht):
         if '\n' not in node:
             node += '\n'
@@ -120,7 +105,7 @@ def dht_append(node):
             f.write(node)
         with open(tools.dht_path, 'r') as f:
             updated_dht = f.readlines()
-        tools.dht = updated_dht
+        tools.dht = tuple(updated_dht)
 
 
 def create_hash(text):
