@@ -2,7 +2,6 @@ import socket
 import sys
 import server
 import os
-from hashlib import sha1
 from uuid import uuid4
 import pickle
 import random
@@ -24,8 +23,25 @@ def create_id():
     return user_hash
 
 
-def upload_file(file, content):
-    pass
+def upload_file(filename, content):
+    file_similarities = list(tools.get_similarity(filename_hash))
+    file_similarities.remove(user_data)
+    file_similarities = tuple(file_similarities)
+    for node in file_similarities[:3]:  # The number of nodes that will receive a file
+        node_data = node.split('-')[1]
+        node_data = node_data.split(':')  # Get an address from the node data and split it to get an ip and port
+        ip = node_data[0]
+        port = int(node_data[1])
+        command = str.encode('put:' + user_data + ':' + filename + '=' + content)
+
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((ip, port))
+                s.sendall(command)
+                data = s.recv(4096)
+        except Exception as ex:
+            print(str(ex))
+            pass
 
 
 def update_db(nodes):
@@ -45,7 +61,7 @@ def update_db(nodes):
     tools.dht = tuple(similarities)
 
 
-def get():
+def bootstrap():
     shuffled_dht = list(tools.dht)
     shuffled_dht.pop(0)
     random.shuffle(shuffled_dht)
@@ -57,7 +73,7 @@ def get():
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((host, port))
-                s.sendall(str.encode('get' + ':' + user_data))
+                s.sendall(str.encode('bootstrap' + ':' + user_data))
                 data = s.recv(4096)
                 unpacked = pickle.loads(data)
                 with open(tools.dht_path, 'r') as f:
@@ -80,7 +96,7 @@ def get():
             continue
 
 
-def put(similarities, command):
+def get(similarities, command):
     print("Sort_similarities: " + str(similarities))
 
     received_nodes = []
@@ -100,16 +116,16 @@ def put(similarities, command):
                 nodes = list(pickle.loads(recvdata))
 
                 if ':' in str(nodes):  # If we received '127.0.0.1:4444' for example
-                    for i in range(len(nodes)):
+                    for node in nodes:
                         # Here we're removing our ip from list and if we have
                         # the same node in the sorted similarities list, we need
                         # to remove it from the received list too.
-                        if user_ip in str(nodes[i]):
-                            nodes.remove(nodes[i])
-                        elif str(nodes[i]).replace('\n', '') in str(similarities):
-                            nodes.remove(nodes[i])
+                        if user_ip in node:
+                            nodes.remove(node)
+                        elif node.replace('\n', '') in str(similarities):
+                            nodes.remove(node)
 
-                    if len(nodes) == 1 and nodes[0] in str(similarities):
+                    if len(nodes) == 1 and nodes[0].replace('\n', '') in str(similarities):
                         # This fixes a bug when 'for' loop in the lines above can't remove the last element
                         nodes.clear()
                     elif len(nodes) != 0:  # If received list contains at least one element
@@ -165,39 +181,39 @@ else:
 server.start(HOST, PORT)
 
 
-commands = ['help - show this message', 'id - print your user_hash', 'get - update DHT', 'put - send file to DHT', 'search - search for a file']
+commands = ['help - show this message', 'id - print your user_hash', 'update - update DHT', 'upload - send file to DHT', 'search - search for a file']
 while True:
     cmd = input("Your command: ")
     if cmd == 'help':
         print(commands)
     elif cmd == 'dht':
         print(str(tools.dht))
-    elif cmd == 'get':
-        get()
+    elif cmd == 'update':
+        bootstrap()
     elif cmd == 'id':
         print("Your id: " + user_hash)
-    elif cmd == 'put' or cmd == 'search':
+    elif cmd == 'upload' or cmd == 'search':
         filename = str(input("File name: "))
         if cmd == 'search':
             data = "<<search>>"
         else:
             with open(filename, 'r') as f:
                 data = f.read()
-        command = 'put:' + user_data + ':' + filename + '=' + data  # put:hash-127.0.0.1:33:file.txt=some_text
+        command = 'get:' + user_data + ':' + filename + '=' + data  # put:hash-127.0.0.1:33:file.txt=some_text
         print(filename)
         filename_hash = tools.create_hash(filename)
         similarities = list(tools.get_similarity(filename_hash))
 
         for i in range(len(similarities)):
-            node_metadata = similarities[i].split('-')
-            node_hash = node_metadata[0]
+            node_data = similarities[i].split('-')
+            node_hash = node_data[0]
 
             if node_hash == user_hash:  # If this is our hash, we remove it from the dictionary
                 similarities.pop(i)
                 break
 
-        similarities = similarities[:5]  # Get first five nodes that have the best similarity with data_hash
-        put(similarities, command)
+        similarities = similarities[:5]  # Get first five nodes that have the best similarity with filename_hash
+        get(similarities, command)
     else:
         print('Wrong command')
 
